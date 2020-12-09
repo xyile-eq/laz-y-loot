@@ -27,7 +27,7 @@ jobs:
         # Artifact name
         name: Release
         # Directory containing files to upload
-        path: /bin/Release/
+        path: bin/Release/
         
     - name: Zip All The Things
       uses: montudor/action-zip@v0.1.0
