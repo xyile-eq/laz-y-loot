@@ -89,31 +89,52 @@ namespace LazLootIni
                         return;
                     }
 
-                    var curSelection = SelectedItem;
-                    if (File.Exists(CurrentFileName))
+                    loadInProgress = true;
+                    Task.Run(() =>
                     {
-                        var newList = ParseItems(File.ReadAllLines(CurrentFileName));
-                        foreach (var item in newList)
+                        var removeItems = new List<ParsedItem>();
+                        var addItems = new List<ParsedItem>();
+                        var curSelection = SelectedItem;
+                        if (File.Exists(CurrentFileName))
                         {
-                            var curLootDict = AllLoot.GroupBy(x => x.Name).ToDictionary(x => x.Key, x => x.First());
-                            if (!curLootDict.TryGetValue(item.Name, out var pi))
+                            var newList = ParseItems(File.ReadAllLines(CurrentFileName));
+                            foreach (var item in newList)
                             {
-                                // something new has arrived
-                                item.NewlyAdded = true;
-                                WriteToLog($"A new item was added: {item.Name}");
-                                AllLoot.Add(item);
-                            }
-                            else
-                            {
-                                // we do know of it, so let's compare things
-                                if (item.IsSkip != pi.IsSkip || item.IsDestroy != pi.IsDestroy || item.IsLore != pi.IsLore || item.IsSell != pi.IsSell || item.IsKeep != pi.IsKeep || item.StackCount != pi.StackCount)
+                                var curLootDict = AllLoot.GroupBy(x => x.Name).ToDictionary(x => x.Key, x => x.First());
+                                if (!curLootDict.TryGetValue(item.Name, out var pi))
                                 {
-                                    AllLoot.Remove(pi);
+                                    // something new has arrived
+                                    item.NewlyAdded = true;
+                                    WriteToLog($"A new item was added: {item.Name}");
                                     AllLoot.Add(item);
                                 }
+                                else
+                                {
+                                    // we do know of it, so let's compare things
+                                    if (item.IsSkip != pi.IsSkip || item.IsDestroy != pi.IsDestroy || item.IsLore != pi.IsLore || item.IsSell != pi.IsSell || item.IsKeep != pi.IsKeep || item.StackCount != pi.StackCount)
+                                    {
+                                        removeItems.Add(pi);
+                                        addItems.Add(item);
+                                        //AllLoot.Remove(pi);
+                                        //AllLoot.Add(item);
+                                    }
+                                }
                             }
+
+                            UIDispatcher.Invoke(() =>
+                            {
+                                foreach (var item in removeItems)
+                                {
+                                    AllLoot.Remove(item);
+                                }
+                                foreach (var item in addItems)
+                                {
+                                    AllLoot.Add(item);
+                                }
+                                loadInProgress = false;
+                            });
                         }
-                    }
+                    });
                 };
                 autoReloaderTimer.Start();
                 searchTimer.Tick += (o, e) =>
