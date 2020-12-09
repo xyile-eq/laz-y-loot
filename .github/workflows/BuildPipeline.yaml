@@ -1,0 +1,51 @@
+name: Build executables and generate release
+
+on:
+  push:
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+jobs:
+  build:
+ 
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup Nuget.exe
+      uses: nuget/setup-nuget@v1
+    - name: Restore packages
+      run: nuget restore LazLootIni.sln
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v1.0.2
+    - name: Build with MSBuild
+      run: msbuild LazLootIni.sln -p:Configuration=Release
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        # Artifact name
+        name: Release
+        # Directory containing files to upload
+        path: ./bin/Release/
+        
+    - name: Zip All The Things
+      uses: montudor/action-zip@v0.1.0
+      with:
+        args: zip -qq -r Laz-y-Loot.zip bin/Release
+        
+    - name: Lookup Release URL
+      id: githubrelease
+      uses: bruceadams/get-release@v1.2.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.githubrelease.outputs.upload_url }}
+        asset_path: Laz-y-Loot.zip
+        asset_name: Laz-y-Loot.zip
+        asset_content_type: application/zip
