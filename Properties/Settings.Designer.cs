@@ -34,5 +34,17 @@ namespace LazLootIni.Properties {
                 this["NumberBackupsRetain"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DefaultLoadFile {
+            get {
+                return ((string)(this["DefaultLoadFile"]));
+            }
+            set {
+                this["DefaultLoadFile"] = value;
+            }
+        }
     }
 }
