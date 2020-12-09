@@ -22,7 +22,7 @@
             <TextBlock Text="Search" />
             <TextBox Margin="5,0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Width="150" />
         </StackPanel>
-        <ListView Grid.Row="1" ItemsSource="{Binding AllLootCVS}" SelectedItem="{Binding SelectedLoot}">
+        <ListView Grid.Row="1" ItemsSource="{Binding AllLootCVS}" SelectedItem="{Binding SelectedLoot}" VirtualizingPanel.IsVirtualizingWhenGrouping="True" VirtualizingPanel.IsContainerVirtualizable="True" VirtualizingPanel.IsVirtualizing="True">
             <ListView.GroupStyle>
                 <GroupStyle>
                     <GroupStyle.HeaderTemplate>

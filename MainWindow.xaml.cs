@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Threading;
@@ -22,15 +23,19 @@ namespace LazLootIni
         {
             InitializeComponent();
             viewModel = new ViewModel();
+            ViewModel.UIDispatcher = this.Dispatcher;
             this.DataContext = viewModel;
 
             viewModel.PropertyChanged += (o, e) =>
             {
                 if (e.PropertyName == nameof(ViewModel.LogText))
                 {
-                    txtStatus.Focus();
-                    txtStatus.CaretIndex = txtStatus.Text.Length;
-                    txtStatus.ScrollToEnd();
+                    Dispatcher.Invoke(() =>
+                    {
+                        txtStatus.Focus();
+                        txtStatus.CaretIndex = txtStatus.Text.Length;
+                        txtStatus.ScrollToEnd();
+                    });
                 }
             };
 
@@ -64,68 +69,26 @@ namespace LazLootIni
 
         public class ViewModel : INPC
         {
-            private DispatcherTimer autoReloaderTimer = new DispatcherTimer() { Interval = TimeSpan.FromSeconds(15) };
+            private DispatcherTimer autoReloaderTimer = new DispatcherTimer() { Interval = TimeSpan.FromSeconds(30) };
 
             private Dictionary<string, CostInfo> costDictionary = new Dictionary<string, CostInfo>();
 
+            static public Dispatcher UIDispatcher;
+
             public ViewModel()
             {
-                LocalItemDB.LoadAsync().ContinueWith((result) =>
-                {
-                    LocalItemDB.Instance = new List<ItemIconInfo>(result.Result);
-                    var currentLoot = AllLoot.ToList();
-                    foreach (var item in currentLoot)
-                    {
-                        var itemInfo = LocalItemDB.Instance.FirstOrDefault(x => x.Name == item.Name);
-                        if (itemInfo != null)
-                        {
-                            item.ItemInfo = itemInfo;
-                        }
-                    }
-                });
+                LocalItemDB.LoadAsync().ContinueWith(t => LocalItemDB.Instance = new List<ItemIconInfo>(t.Result));
 
                 var costInfo = JsonConvert.DeserializeObject<CostInfo[]>(File.ReadAllText(LocalItemDB.ItemValuesPath));
                 costDictionary = costInfo.GroupBy(x => x.Name).ToDictionary(x => x.Key, x => x.First());
 
-                AllLoot.CollectionChanged += (o, e) =>
-                {
-                    if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
-                    {
-                        foreach (var ni in e.NewItems.Cast<ParsedItem>())
-                        {
-                            ni.ItemChanged += (_, _) =>
-                            {
-                                var lineToUpdate = LoadedLines.IndexOf(ni.OriginalText);
-                                if (lineToUpdate < 0)
-                                {
-                                    MessageBox.Show($"Unable to find line to update using original text: {ni.OriginalText}");
-                                }
-
-                                // otherwise lets go ahead and replace
-                                var newText = ni.GenerateLine();
-                                LoadedLines[lineToUpdate] = newText;
-                                ni.OriginalText = newText;
-                                WriteToLog($"Updating line {lineToUpdate} to: {newText}");
-                                File.Delete(CurrentFileName);
-                                File.WriteAllLines(CurrentFileName, LoadedLines.ToArray());
-                            };
-
-                            if (ni.ItemInfo == null && LocalItemDB.Instance != null)
-                            {
-                                ni.ItemInfo = LocalItemDB.Instance.FirstOrDefault(x => x.Name == ni.Name);
-                            }
-
-                            if (costDictionary.TryGetValue(ni.Name, out var ci))
-                            {
-                                ni.PlatValue = ci.Price / 1000;
-                                ni.TributeValue = ci.Favor;
-                            }
-                        }
-                    }
-                };
-
                 autoReloaderTimer.Tick += (o, e) =>
                 {
+                    if (loadInProgress)
+                    {
+                        return;
+                    }
+
                     var curSelection = SelectedItem;
                     if (File.Exists(CurrentFileName))
                     {
@@ -153,6 +116,10 @@ namespace LazLootIni
                     }
                 };
                 autoReloaderTimer.Start();
+                searchTimer.Tick += (o, e) =>
+                {
+                    NotifyPropertyChanged(nameof(AllLootCVS));
+                };
             }
 
             private int _numberOfBackupsToKeep = Properties.Settings.Default.NumberBackupsRetain;
@@ -186,6 +153,8 @@ namespace LazLootIni
                 }
             }
 
+            private DispatcherTimer searchTimer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(400) };
+
             private string _searchText;
             public string SearchText
             {
@@ -198,7 +167,9 @@ namespace LazLootIni
                 {
                     _searchText = value;
                     NotifyPropertyChanged(nameof(SearchText));
-                    NotifyPropertyChanged(nameof(AllLootCVS));
+                    searchTimer.Stop();
+                    searchTimer.Start();
+                    
                 }
             }
 
@@ -251,6 +222,7 @@ namespace LazLootIni
                 {
                     _allLoot = value;
                     NotifyPropertyChanged(nameof(AllLoot));
+                    NotifyPropertyChanged(nameof(AllLootCVS));
                 }
             }
 
@@ -326,7 +298,9 @@ namespace LazLootIni
 
                     cvs.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
 
-                    cvs.GroupDescriptions.Add(new PropertyGroupDescription("Description"));
+                    //cvs.GroupDescriptions.Add(new PropertyGroupDescription("Description"));
+
+                    var anyFilter = false;
 
                     if (FilterPlatNoSell)
                     {
@@ -335,6 +309,7 @@ namespace LazLootIni
                             var pi = e.Item as ParsedItem;
                             e.Accepted = !pi.IsSell && pi.Value != null && pi.Value > 0;
                         };
+                        anyFilter = true;
                     }
                     else if (FilterKeepNoValue)
                     {
@@ -343,6 +318,7 @@ namespace LazLootIni
                             var pi = e.Item as ParsedItem;
                             e.Accepted = pi.IsKeep && pi.Value == null || pi.Value < 1;
                         };
+                        anyFilter = true;
                     }
 
                     if (FilterRecentItems)
@@ -352,6 +328,7 @@ namespace LazLootIni
                             var pi = e.Item as ParsedItem;
                             e.Accepted = pi.NewlyAdded;
                         };
+                        anyFilter = true;
                     }
 
                     if (!string.IsNullOrWhiteSpace(SearchText))
@@ -359,9 +336,33 @@ namespace LazLootIni
                         cvs.Filter += (o, e) =>
                         {
                             var pi = e.Item as ParsedItem;
-                            e.Accepted = pi.Name.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) > 0;
+                            e.Accepted = pi.Name.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) >= 0;
                         };
+                        anyFilter = true;
                     }
+
+                    //if (!anyFilter)
+                    //{
+                    //    cvs.Filter += (o, e) => { e.Accepted = false; };
+                    //}
+
+                    var theList = cvs.View.Cast<ParsedItem>().ToList();
+                    Task.Run(() =>
+                    {
+                        foreach (var ni in theList)
+                        {
+                            if (ni.ItemInfo == null && LocalItemDB.Instance != null)
+                            {
+                                ni.ItemInfo = LocalItemDB.Instance.FirstOrDefault(x => x.Name == ni.Name);
+                            }
+
+                            if (costDictionary.TryGetValue(ni.Name, out var ci))
+                            {
+                                ni.PlatValue = ci.Price / 1000;
+                                ni.TributeValue = ci.Favor;
+                            }
+                        }
+                    });
 
                     return cvs.View;
                 }
@@ -431,7 +432,18 @@ namespace LazLootIni
                         continue;
                     }
 
-                    var words = line.Substring(0, line.IndexOf('=')).Split(' ');
+                    var words = default(string[]);
+
+                    try
+                    {
+                        words = line.Substring(0, line.IndexOf('=')).Split(' ');
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error on line {currentIndex}: {ex.Message}");
+                        Console.WriteLine($"Line contents: {line}");
+                        continue;
+                    }
 
                     var valstack = words.Last();
                     if (valstack.IndexOf("(") >= 0 || Regex.Match(valstack, @"[0-9]{1,}p").Success)
@@ -463,6 +475,23 @@ namespace LazLootIni
                         pi.Value = vval;
                     }
 
+                    pi.ItemChanged += (_, _) =>
+                    {
+                        var lineToUpdate = LoadedLines.IndexOf(pi.OriginalText);
+                        if (lineToUpdate < 0)
+                        {
+                            MessageBox.Show($"Unable to find line to update using original text: {pi.OriginalText}");
+                        }
+
+                        // otherwise lets go ahead and replace
+                        var newText = pi.GenerateLine();
+                        LoadedLines[lineToUpdate] = newText;
+                        pi.OriginalText = newText;
+                        WriteToLog($"Updating line {lineToUpdate} to: {newText}");
+                        File.Delete(CurrentFileName);
+                        File.WriteAllLines(CurrentFileName, LoadedLines.ToArray());
+                    };
+
                     pi.TriggerUpdates = true;
 
                     ret.Add(pi);
@@ -470,6 +499,8 @@ namespace LazLootIni
                 return ret;
             }
 
+            Queue<ParsedItem> readyForDisplay = new Queue<ParsedItem>();
+            private bool loadInProgress = false;
 
             public void LoadFile(string path, bool takeBackup = false)
             {
@@ -490,18 +521,27 @@ namespace LazLootIni
                 try
                 {
                     var lines = File.ReadAllLines(path);
+                    
+                    loadInProgress = true;
 
-                    foreach (var item in ParseItems(lines))
+                    var templist = new ObservableCollection<ParsedItem>();
+                    Task.Run(() =>
                     {
-                        AllLoot.Add(item);
-                    }
+                        foreach (var item in ParseItems(lines))
+                        {
+                            templist.Add(item);
+                        }
+                    }).ContinueWith((t) =>
+                    {
+                        AllLoot = templist;
+                        loadInProgress = false;
+                        WriteToLog($"A total of {AllLoot.Count} item(s) were loaded from the ini file.");
+                    });
                 }
                 catch (Exception ex)
                 {
                     WriteToLog($"An exception occurred while loading: {ex.Message}");
                 }
-
-                WriteToLog($"A total of {AllLoot.Count} item(s) were loaded from the ini file.");
             }
 
 
