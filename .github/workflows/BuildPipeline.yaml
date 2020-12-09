@@ -30,7 +30,7 @@ jobs:
         path: bin/Release/
         
     - name: Zip All The Things
-       run: |
+       run:|
         powershell Compress-Archive bin/Release Laz-y-Loot.zip 
         
     - name: Lookup Release URL
