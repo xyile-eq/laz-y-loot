@@ -12,6 +12,11 @@ namespace LazLootIni
 {
     static public class LocalItemDB
     {
+        public const string ItemDbJsonPath = @"assets\itemdb.json";
+        public const string IconDatPath = @"assets\icons.dat";
+        public const string MappingsPath = @"assets\mappings.json";
+        public const string ItemValuesPath = @"assets\itemvalues.dat";
+
         public static List<ItemIconInfo> Instance { get; internal set; }
         public static FileStream IconPack { get; set; }
         public static Dictionary<int, dynamic> IconMappings { get; set; }
@@ -19,7 +24,7 @@ namespace LazLootIni
         static public async Task<List<ItemIconInfo>> LoadAsync()
         {
 
-            if (!File.Exists("itemdb.json") || !File.Exists("icons.dat") || !File.Exists("mappings.json"))
+            if (!File.Exists(ItemDbJsonPath) || !File.Exists(IconDatPath) || !File.Exists(MappingsPath))
             {
                 var task = Task.Factory.StartNew(() =>
                 {
@@ -35,7 +40,7 @@ namespace LazLootIni
 
             try
             {
-                using (var sr = new StreamReader(File.OpenRead("itemdb.json")))
+                using (var sr = new StreamReader(File.OpenRead(ItemDbJsonPath)))
                 {
                     var json = await sr.ReadToEndAsync();
                     ret.AddRange(JsonConvert.DeserializeObject<ItemIconInfo[]>(json));
@@ -46,10 +51,10 @@ namespace LazLootIni
 
             }
 
-            IconPack = new FileStream(@"icons.dat", FileMode.Open, FileAccess.Read, FileShare.Read);
+            IconPack = new FileStream(IconDatPath, FileMode.Open, FileAccess.Read, FileShare.Read);
 
             IconMappings = new Dictionary<int, dynamic>();
-            dynamic mappings = JsonConvert.DeserializeObject(File.ReadAllText(@"mappings.json"));
+            dynamic mappings = JsonConvert.DeserializeObject(File.ReadAllText(MappingsPath));
             foreach (var item in mappings)
             {
                 IconMappings.Add((int)item.ID, (dynamic)item);
@@ -88,32 +93,32 @@ namespace LazLootIni
 
         static public async void DownloadAsync()
         {
-            if (!File.Exists("itemdb.json"))
+            if (!File.Exists(ItemDbJsonPath))
             {
                 using (var wc = new WebClient())
                 {
                     var data = await wc.DownloadDataTaskAsync(new Uri("https://s3.us-east-2.amazonaws.com/mamfiles/itemdb.json"));
-                    File.WriteAllBytes("itemdb.json", data);
+                    File.WriteAllBytes(ItemDbJsonPath, data);
 
 
                 }
             }
 
-            if (!File.Exists("icons.dat"))
+            if (!File.Exists(IconDatPath))
             {
                 using (var wc = new WebClient())
                 {
                     var icons = await wc.DownloadDataTaskAsync(new Uri("https://s3.us-east-2.amazonaws.com/mamfiles/icons.dat"));
-                    File.WriteAllBytes("icons.dat", icons);
+                    File.WriteAllBytes(IconDatPath, icons);
                 }
             }
 
-            if (!File.Exists("mappings.json"))
+            if (!File.Exists(MappingsPath))
             {
                 using (var wc = new WebClient())
                 {
                     var mappings = await wc.DownloadDataTaskAsync(new Uri("https://s3.us-east-2.amazonaws.com/mamfiles/mappings.json"));
-                    File.WriteAllBytes("mappings.json", mappings);
+                    File.WriteAllBytes(MappingsPath, mappings);
                 }
             }
 

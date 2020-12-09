@@ -16,7 +16,7 @@
         <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="8">
             <CheckBox Content="Filter Plat Items w/ no Sell" IsChecked="{Binding FilterPlatNoSell}" />
             <CheckBox Content="Filter Keep w/ no Value" Margin="10,0" IsChecked="{Binding FilterKeepNoValue}" />
-            <CheckBox Content="Show only recently added items" Margin="10,0" IsChecked="{Binding FilterRecentItems}" />
+            <CheckBox Content="Only show recently added items" Margin="10,0" IsChecked="{Binding FilterRecentItems}" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="8" HorizontalAlignment="Right">
             <TextBlock Text="Search" />
@@ -126,7 +126,7 @@
             </ListView.View>
         </ListView>
         <Grid Grid.Row="2" Height="100">
-            <TextBox x:Name="txtStatus" AcceptsReturn="True" IsReadOnly="True" Text="{Binding LogText}">
+            <TextBox x:Name="txtStatus" AcceptsReturn="True" IsReadOnly="True" Text="{Binding LogText}" TextWrapping="Wrap" FontSize="11">
                 
             </TextBox>
         </Grid>
