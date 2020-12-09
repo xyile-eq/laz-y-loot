@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:LazLootIni"
         mc:Ignorable="d"
         Icon="/LazLootIni;component/assets/item_1165.ico"
-        Title="Laz-y-loot" Height="450" Width="800" AllowDrop="True" Drop="Window_Drop">
+        Title="Laz-y-loot" Height="450" Width="800" AllowDrop="True" Drop="Window_Drop" Activated="Window_Activated">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
