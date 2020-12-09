@@ -30,9 +30,8 @@ jobs:
         path: bin/Release/
         
     - name: Zip All The Things
-      uses: montudor/action-zip@v0.1.0
-      with:
-        args: zip -qq -r Laz-y-Loot.zip bin/Release
+       run: |
+        powershell Compress-Archive bin/Release Laz-y-Loot.zip 
         
     - name: Lookup Release URL
       id: githubrelease
