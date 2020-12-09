@@ -405,8 +405,9 @@ namespace LazLootIni
                         var toDelete = files.OrderBy(x => x.CreationTime).First();
                         WriteToLog($"Deleting oldest backup to make room. Name: {toDelete.FullName}");
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        WriteToLog($"An exception occurred while deleting the oldest backup: {ex.Message}");
                     }
                 }
             }
@@ -476,14 +477,28 @@ namespace LazLootIni
 
                 if (takeBackup)
                 {
-                    TakeBackup(path);
+                    try
+                    {
+                        TakeBackup(path);
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteToLog($"An exception occurred while loading: {ex.Message}");
+                    }
                 }
 
-                var lines = File.ReadAllLines(path);
-
-                foreach (var item in ParseItems(lines))
+                try
                 {
-                    AllLoot.Add(item);
+                    var lines = File.ReadAllLines(path);
+
+                    foreach (var item in ParseItems(lines))
+                    {
+                        AllLoot.Add(item);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteToLog($"An exception occurred while loading: {ex.Message}");
                 }
 
                 WriteToLog($"A total of {AllLoot.Count} item(s) were loaded from the ini file.");
