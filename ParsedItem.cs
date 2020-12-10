@@ -68,7 +68,9 @@ namespace LazLootIni
                 NotifyPropertyChanged(nameof(IsKeep));
                 if (value == true && TriggerUpdates)
                 {
-                    IsSkip = false;
+                    _isSkip = false;
+                    NotifyPropertyChanged(nameof(IsSkip));
+
                     ItemChanged?.Invoke(this, new EventArgs());
                 }
             }
@@ -88,7 +90,8 @@ namespace LazLootIni
                 NotifyPropertyChanged(nameof(IsSkip));
                 if (value == true && TriggerUpdates)
                 {
-                    IsKeep = false;
+                    _isKeep = false;
+                    NotifyPropertyChanged(nameof(IsKeep));
                     ItemChanged?.Invoke(this, new EventArgs());
                 }
             }
@@ -108,7 +111,8 @@ namespace LazLootIni
                 NotifyPropertyChanged(nameof(IsSell));
                 if (value == true && TriggerUpdates)
                 {
-                    IsDestroy = false;
+                    _isDestroy = false;
+                    NotifyPropertyChanged(nameof(IsDestroy));
                     ItemChanged?.Invoke(this, new EventArgs());
                 }
             }
@@ -127,7 +131,8 @@ namespace LazLootIni
                 NotifyPropertyChanged(nameof(IsDestroy));
                 if (value == true && TriggerUpdates)
                 {
-                    IsSell = false;
+                    _isSell = false;
+                    NotifyPropertyChanged(nameof(IsSell));
                     ItemChanged?.Invoke(this, new EventArgs());
                 }
             }

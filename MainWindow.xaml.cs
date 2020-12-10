@@ -32,7 +32,6 @@ namespace LazLootIni
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        txtStatus.Focus();
                         txtStatus.CaretIndex = txtStatus.Text.Length;
                         txtStatus.ScrollToEnd();
                     });
@@ -54,15 +53,24 @@ namespace LazLootIni
                 var files = e.Data.GetData("FileDrop") as string[];
                 if (files != null && files.Length == 1)
                 {
-                    if (Properties.Settings.Default.DefaultLoadFile != files[0])
+                    var tar = files[0];
+                    var name = new FileInfo(tar).Name;
+                    if (name.StartsWith("eqlog") && name.EndsWith(".txt"))
                     {
-                        if (MessageBox.Show($"The file you just dropped is not set as the default. Would you like to set it now? Once set, this will automatically be loaded on launch.", "Set default?", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
-                        {
-                            Properties.Settings.Default.DefaultLoadFile = files[0];
-                            Properties.Settings.Default.Save();
-                        }
+                        viewModel.LoadLog(new FileInfo(tar).FullName);
                     }
-                    viewModel.LoadFile(files[0], true);
+                    else
+                    {
+                        if (Properties.Settings.Default.DefaultLoadFile != files[0])
+                        {
+                            if (MessageBox.Show($"The file you just dropped is not set as the default. Would you like to set it now? Once set, this will automatically be loaded on launch.", "Set default?", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                            {
+                                Properties.Settings.Default.DefaultLoadFile = files[0];
+                                Properties.Settings.Default.Save();
+                            }
+                        }
+                        viewModel.LoadFile(files[0], true);
+                    }
                 }
             }
         }

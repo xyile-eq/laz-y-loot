@@ -33,7 +33,63 @@ namespace LazLootIni
             {
                 NotifyPropertyChanged(nameof(AllLootCVS));
             };
+
+            if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.LogPath))
+            {
+                LoadLog(Properties.Settings.Default.LogPath);
+            }
         }
+
+        private LogFileMonitor logFileMonitor;
+
+        public void LoadLog(string path)
+        {
+            if (logFileMonitor != null)
+            {
+                logFileMonitor = null;
+            }
+
+            logFileMonitor = new LogFileMonitor(path);
+            logFileMonitor.OnLoot += LogFileMonitor_OnLoot;
+        }
+
+        private void LogFileMonitor_OnLoot(object sender, LootedEventArgs e)
+        {
+            var ni = new ParsedItem()
+            {
+                Name = e.ItemName,
+            };
+
+
+            if (ni.ItemInfo == null && LocalItemDB.Instance != null)
+            {
+                ni.ItemInfo = LocalItemDB.Instance.FirstOrDefault(x => x.Name == ni.Name);
+            }
+
+            if (costDictionary.TryGetValue(ni.Name, out var ci))
+            {
+                ni.PlatValue = ci.Price / 1000;
+                ni.TributeValue = ci.Favor;
+            };
+
+            RecentlyLooted.Add(ni);
+        }
+
+        private ObservableCollection<ParsedItem> _recentlyLooted = new ObservableCollection<ParsedItem>();
+        public ObservableCollection<ParsedItem> RecentlyLooted
+        {
+            get
+            {
+                return _recentlyLooted;
+            }
+
+            set
+            {
+                _recentlyLooted = value;
+                NotifyPropertyChanged(nameof(RecentlyLooted));
+            }
+        }
+
 
         public void PerformRefreshIfNeeded()
         {
@@ -538,6 +594,27 @@ namespace LazLootIni
         }
 
 
+        private InlineCommand _pasteFakeLogs;
+
+        public InlineCommand pasteFakeLogs
+        {
+            get
+            {
+                if (_pasteFakeLogs == null)
+                {
+                    _pasteFakeLogs = new InlineCommand((obj) =>
+                    {
+                        var lines = Clipboard.GetText().Split('\n');
+                        foreach (var line in lines)
+                        {
+                            logFileMonitor?.HandleLine(line);
+                        }
+                    });
+                }
+
+                return _pasteFakeLogs;
+            }
+        }
 
     }
 }
