@@ -14,6 +14,8 @@ namespace LazLootIni
     {
         public string Looter { get; set; }
         public string ItemName { get; set; }
+
+        public string OriginalLine { get; set; }
     }
 
     public class LogFileMonitor : INPC
@@ -25,6 +27,15 @@ namespace LazLootIni
                 LogPath = path;
                 Worker = StartParse();
             }
+
+            lootBlockTimer.Tick += (o, e) =>
+            {
+                if (IsBlockingOwnLoots)
+                {
+                    IsBlockingOwnLoots = false;
+                    lootBlockTimer.Stop();
+                }
+            };
         }
 
         private  BackgroundWorker Worker { get; set; }
@@ -47,6 +58,24 @@ namespace LazLootIni
             }
         }
 
+        private bool _isBlockingOwnLoots = false;
+        public bool IsBlockingOwnLoots
+        {
+            get
+            {
+                return _isBlockingOwnLoots;
+            }
+
+            set
+            {
+                _isBlockingOwnLoots = value;
+                NotifyPropertyChanged(nameof(IsBlockingOwnLoots));
+            }
+        }
+
+        private DispatcherTimer lootBlockTimer = new DispatcherTimer() { Interval = TimeSpan.FromMinutes(1) };
+
+
         public event EventHandler<LootedEventArgs> OnLoot = (o, e) => { };
 
         public void HandleLine(string line)
@@ -54,11 +83,27 @@ namespace LazLootIni
             if (line.Contains(']'))
             {
                 line = line.Substring(line.IndexOf(']') + 2);
+
+                if (Regex.IsMatch(line, @"^You have been slain by") ||
+                    Regex.IsMatch(line, @"(?i)tells you, 'wait4rez'$") ||
+                    Regex.IsMatch(line, @"^You regain [0-9]{1,} experience from resurrection."))
+                {
+                    IsBlockingOwnLoots = true;
+                    lootBlockTimer.Stop();
+                    lootBlockTimer.Start();
+                }
+
                 var lootMatch = Regex.Match(line, @"--(?<name>[\w\W]*?) (has|have) looted a (?<itemName>[\w\W]*?).--");
                 if (lootMatch.Success)
                 {
-                    OnLoot(this, new LootedEventArgs() { ItemName = lootMatch.Groups["itemName"].Value, Looter = lootMatch.Groups["name"].Value });
-                    //Console.WriteLine($"item looted by {lootMatch.Groups["name"].Value}: {lootMatch.Groups["itemName"].Value}");
+                    var args = new LootedEventArgs() { ItemName = lootMatch.Groups["itemName"].Value, Looter = lootMatch.Groups["name"].Value, OriginalLine = line };
+
+                    if (args.Looter == "You" && IsBlockingOwnLoots)
+                    {
+                        return;
+                    }
+
+                    OnLoot(this, args);
                 }
             }
         }

@@ -14,8 +14,13 @@ namespace LazLootIni
         public int LineIndex { get; set; }
 
 
+        public string LootedBy { get; set; }
+
         public string Name { get; set; }
         public bool IsLore { get; set; }
+
+        public bool IsNoDrop { get; set; }
+
         public int? Value { get; set; }
 
         public int? PlatValue { get; set; }
@@ -37,6 +42,22 @@ namespace LazLootIni
             }
         }
 
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get
+            {
+                return _isSelected;
+            }
+
+            set
+            {
+                _isSelected = value;
+                NotifyPropertyChanged(nameof(IsSelected));
+            }
+        }
+
+
         private bool _newlyAdded;
         public bool NewlyAdded
         {
@@ -52,6 +73,20 @@ namespace LazLootIni
             }
         }
 
+        private bool _showAtTop;
+        public bool ShowAtTop
+        {
+            get
+            {
+                return _showAtTop;
+            }
+
+            set
+            {
+                _showAtTop = value;
+                NotifyPropertyChanged(nameof(ShowAtTop));
+            }
+        }
 
 
         private bool _isKeep;
@@ -194,6 +229,7 @@ namespace LazLootIni
             var stk = StackCount != null && StackCount > 0 ? $"({StackCount})" : "";
             var val = Value < 1 || Value == null ? "" : $"{Value}p";
             var lore = IsLore ? "(L)" : "";
+            var nd = IsNoDrop ? "(ND)" : "";
 
             var keepOrSkip = IsKeep ? "Keep" : "Skip";
             if (IsKeep && StackCount > 0)
@@ -216,7 +252,7 @@ namespace LazLootIni
             {
                 output += " ";
             }
-            return $"{output}{val}{lore}{stk}={keepOrSkip}";
+            return $"{output}{val}{nd}{lore}{stk}={keepOrSkip}";
         }
 
         private InlineCommand _checkBazCommand;

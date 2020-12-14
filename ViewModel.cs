@@ -55,9 +55,23 @@ namespace LazLootIni
 
         private void LogFileMonitor_OnLoot(object sender, LootedEventArgs e)
         {
+            var wasSelected = false;
+            var existingLoot = RecentlyLooted.FirstOrDefault(x => x.Name == e.ItemName);
+            if (existingLoot != null)
+            {
+                if (existingLoot == SelectedRecentLoot)
+                {
+                    wasSelected = true;
+                }
+                RecentlyLooted.Remove(existingLoot);
+            }
+
+
             var ni = new ParsedItem()
             {
                 Name = e.ItemName,
+                LootedBy = e.Looter,
+                OriginalText = e.OriginalLine,
             };
 
 
@@ -72,7 +86,15 @@ namespace LazLootIni
                 ni.TributeValue = ci.Favor;
             };
 
-            RecentlyLooted.Add(ni);
+            RecentlyLooted.Insert(0,ni);
+            if (RecentlyLooted.Count > 20)
+            {
+                RecentlyLooted.RemoveAt(RecentlyLooted.Count-1);
+            }
+            if (wasSelected)
+            {
+                SelectedRecentLoot = ni;
+            }
         }
 
         private ObservableCollection<ParsedItem> _recentlyLooted = new ObservableCollection<ParsedItem>();
@@ -89,6 +111,42 @@ namespace LazLootIni
                 NotifyPropertyChanged(nameof(RecentlyLooted));
             }
         }
+
+        private List<ParsedItem> showAtTopList = new List<ParsedItem>();
+
+        private ParsedItem _selectedRecentLoot;
+        public ParsedItem SelectedRecentLoot
+        {
+            get
+            {
+                return _selectedRecentLoot;
+            }
+
+            set
+            {
+                _selectedRecentLoot = value;
+                NotifyPropertyChanged(nameof(SelectedRecentLoot));
+
+                if (value != null)
+                {
+                    foreach (var item in showAtTopList)
+                    {
+                        item.ShowAtTop = false;
+                    }
+                    showAtTopList.Clear();
+
+                    var forHighlight = AllLoot.FirstOrDefault(x => x.Name.Equals(value.Name));
+                    if (forHighlight != null)
+                    {
+                        showAtTopList.Add(forHighlight);
+                        forHighlight.ShowAtTop = true;
+                    }
+                }
+
+                NotifyPropertyChanged(nameof(AllLootCVS));
+            }
+        }
+
 
 
         public void PerformRefreshIfNeeded()
@@ -343,6 +401,7 @@ namespace LazLootIni
                 var cvs = new CollectionViewSource();
                 cvs.Source = AllLoot;
 
+                cvs.SortDescriptions.Add(new SortDescription("ShowAtTop", ListSortDirection.Descending));
                 cvs.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
 
                 //cvs.GroupDescriptions.Add(new PropertyGroupDescription("Description"));
@@ -354,7 +413,7 @@ namespace LazLootIni
                     cvs.Filter += (o, e) =>
                     {
                         var pi = e.Item as ParsedItem;
-                        e.Accepted = !pi.IsSell && pi.Value != null && pi.Value > 0;
+                        e.Accepted = (!pi.IsSell && pi.Value != null && pi.Value > 0) || (SelectedRecentLoot != null && pi.Name.Equals(SelectedRecentLoot.Name));
                     };
                     anyFilter = true;
                 }
@@ -363,7 +422,7 @@ namespace LazLootIni
                     cvs.Filter += (o, e) =>
                     {
                         var pi = e.Item as ParsedItem;
-                        e.Accepted = pi.IsKeep && pi.Value == null || pi.Value < 1;
+                        e.Accepted = pi.IsKeep && pi.Value == null || pi.Value < 1 || (SelectedRecentLoot != null && pi.Name.Equals(SelectedRecentLoot.Name));
                     };
                     anyFilter = true;
                 }
@@ -373,7 +432,7 @@ namespace LazLootIni
                     cvs.Filter += (o, e) =>
                     {
                         var pi = e.Item as ParsedItem;
-                        e.Accepted = pi.NewlyAdded;
+                        e.Accepted = pi.NewlyAdded || (SelectedRecentLoot != null && pi.Name.Equals(SelectedRecentLoot.Name));
                     };
                     anyFilter = true;
                 }
@@ -383,7 +442,7 @@ namespace LazLootIni
                     cvs.Filter += (o, e) =>
                     {
                         var pi = e.Item as ParsedItem;
-                        e.Accepted = pi.Name.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) >= 0;
+                        e.Accepted = pi.Name.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) >= 0 || (SelectedRecentLoot != null && pi.Name.Equals(SelectedRecentLoot.Name));
                     };
                     anyFilter = true;
                 }
@@ -393,7 +452,7 @@ namespace LazLootIni
                 //    cvs.Filter += (o, e) => { e.Accepted = false; };
                 //}
 
-                var theList = cvs.View.Cast<ParsedItem>().ToList();
+                    var theList = cvs.View.Cast<ParsedItem>().ToList();
                 Task.Run(() =>
                 {
                     foreach (var ni in theList)
@@ -452,6 +511,7 @@ namespace LazLootIni
                 {
                     var toDelete = files.OrderBy(x => x.CreationTime).First();
                     WriteToLog($"Deleting oldest backup to make room. Name: {toDelete.FullName}");
+                    toDelete.Delete();
                 }
                 catch (Exception ex)
                 {
@@ -464,8 +524,9 @@ namespace LazLootIni
         {
             var ret = new List<ParsedItem>();
             var currentIndex = 0;
-            foreach (var line in lines)
+            foreach (var oline in lines)
             {
+                var line = oline;
                 currentIndex++;
                 LoadedLines.Add(line);
 
@@ -478,6 +539,8 @@ namespace LazLootIni
                 {
                     continue;
                 }
+
+                line = line.Replace(';', ':');
 
                 var words = default(string[]);
 
@@ -502,10 +565,11 @@ namespace LazLootIni
 
                 var pi = new ParsedItem()
                 {
-                    OriginalText = line,
+                    OriginalText = oline,
                     LineIndex = currentIndex,
                     Name = string.Join(" ", words),
                     IsLore = valstack.IndexOf("(L)") >= 0,
+                    IsNoDrop = valstack.IndexOf("(ND)") >= 0,
                     IsKeep = actions.IndexOf("Keep") >= 0,
                     IsDestroy = actions.IndexOf("Destroy") >= 0,
                     IsSell = actions.IndexOf("Sell") >= 0,
@@ -613,6 +677,55 @@ namespace LazLootIni
                 }
 
                 return _pasteFakeLogs;
+            }
+        }
+
+
+        private InlineCommand _tidyUpFileCommand;
+
+        public InlineCommand tidyUpFileCommand
+        {
+            get
+            {
+                if (_tidyUpFileCommand == null)
+                {
+                    _tidyUpFileCommand = new InlineCommand((obj) =>
+                    {
+                        var output = "";
+                        for (char alphaLetter = 'A'; alphaLetter <= 'Z'; alphaLetter++)
+                        {
+                            output += $"[{alphaLetter}]\n";
+                            output += $"{alphaLetter} is for=\n";
+                            var loots = AllLoot.Where(x => x.Name.ToUpper().ElementAtOrDefault(0) == alphaLetter).OrderBy(x => x.Name);
+                            foreach (var loot in loots)
+                            {
+                                output += loot.GenerateLine() + "\n";
+                            }
+                        }
+                        Clipboard.SetText(output);
+                    });
+                }
+
+                return _tidyUpFileCommand;
+            }
+        }
+
+
+        private InlineCommand _itemBrowserCommand;
+
+        public InlineCommand itemBrowserCommand
+        {
+            get
+            {
+                if (_itemBrowserCommand == null)
+                {
+                    _itemBrowserCommand = new InlineCommand((obj) =>
+                    {
+                        new ItemBrowserWindow().Show();
+                    });
+                }
+
+                return _itemBrowserCommand;
             }
         }
 
